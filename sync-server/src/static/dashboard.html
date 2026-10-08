@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="300">
+<title>Team Collab Dashboard</title>
+<style>
+:root {
+  --bg: #0d1117; --card: #161b22; --border: #30363d;
+  --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff;
+  --online: #3fb950; --offline: #f85149; --warn: #d2991d;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace; background: var(--bg); color: var(--text); padding: 20px; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+h1 { font-size: 20px; color: var(--accent); }
+.status-badge { font-size: 12px; padding: 2px 8px; border-radius: 12px; }
+.status-badge.connected { background: var(--online); color: #000; }
+.status-badge.disconnected { background: var(--offline); color: #fff; }
+.team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+.team-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.team-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(88,166,255,0.05); }
+.team-header h2 { font-size: 15px; }
+.team-header .member-count { font-size: 12px; color: var(--muted); }
+.agent-list { padding: 8px 0; }
+.agent-row { display: flex; align-items: center; padding: 8px 16px; gap: 10px; border-bottom: 1px solid rgba(48,54,61,0.5); }
+.agent-row:last-child { border-bottom: none; }
+.agent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.agent-dot.online { background: var(--online); box-shadow: 0 0 6px var(--online); }
+.agent-dot.offline { background: var(--offline); }
+.agent-dot.unknown { background: var(--warn); }
+.agent-info { flex: 1; min-width: 0; }
+.agent-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-host { font-size: 11px; color: var(--muted); }
+.agent-time { font-size: 11px; color: var(--muted); white-space: nowrap; text-align: right; }
+.agent-status { font-size: 10px; padding: 1px 6px; border-radius: 8px; white-space: nowrap; }
+.agent-status.online { background: rgba(63,185,80,0.15); color: var(--online); }
+.agent-status.offline { background: rgba(248,81,73,0.15); color: var(--offline); }
+.empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+.empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Team Collab Dashboard</h1>
+  <span id="connStatus" class="status-badge disconnected">disconnected</span>
+</header>
+<div class="team-grid" id="teamGrid">
+  <div class="empty-state">
+    <div class="icon">🔍</div>
+    <div>Discovering teams...</div>
+  </div>
+</div>
+<footer>
+  <span id="lastUpdate">--</span>
+  <span id="eventCount">events: 0</span>
+</footer>
+
+<script>
+const API_BASE = window.location.origin;
+const sseConnections = new Map();
+let totalEvents = 0;
+let connectedCount = 0;
+
+function setStatus(connected) {
+  const el = document.getElementById('connStatus');
+  if (connected) {
+    el.textContent = 'connected';
+    el.className = 'status-badge connected';
+  } else {
+    el.textContent = 'disconnected';
+    el.className = 'status-badge disconnected';
+  }
+}
+
+function formatTime(ts) {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  return d.toLocaleTimeString();
+}
+
+function updateLastUpdate() {
+  document.getElementById('lastUpdate').textContent = 'updated: ' + new Date().toLocaleTimeString();
+}
+
+// Agents state: teamName -> Map<agentId, {agentId, agentName, status, lastSeen, hostname}>
+const teamAgents = new Map();
+
+function updateAgent(teamName, data) {
+  if (!teamAgents.has(teamName)) {
+    teamAgents.set(teamName, new Map());
+  }
+  const agents = teamAgents.get(teamName);
+  const key = data.agentId || data.agentName || 'unknown';
+  agents.set(key, {
+    agentId: data.agentId || data.agentName || 'unknown',
+    agentName: data.agentName || data.agentId || 'unknown',
+    status: data.status || 'online',
+    lastSeen: data.lastSeen || Date.now(),
+    hostname: data.hostname || '',
+  });
+  render();
+}
+
+function closeAllSSE() {
+  for (const [team, es] of sseConnections) {
+    es.close();
+  }
+  sseConnections.clear();
+}
+
+function connectTeamSSE(teamName) {
+  if (sseConnections.has(teamName)) return;
+  const url = `${API_BASE}/api/team_memory/events?repo=${encodeURIComponent(teamName)}`;
+  const es = new EventSource(url);
+  sseConnections.set(teamName, es);
+
+  es.onopen = () => {
+    connectedCount++;
+    setStatus(connectedCount > 0);
+  };
+
+  es.addEventListener('presence', (e) => {
+    try {
+      const payload = JSON.parse(e.data);
+      const data = payload.data ? JSON.parse(payload.data) : payload;
+      updateAgent(teamName, data);
+      totalEvents++;
+      document.getElementById('eventCount').textContent = `events: ${totalEvents}`;
+    } catch (err) { /* skip malformed */ }
+  });
+
+  es.addEventListener('memory', (e) => {
+    try {
+      const payload = JSON.parse(e.data);
+      const data = payload.data ? JSON.parse(payload.data) : payload;
+      if (data && data.agentId) {
+        updateAgent(teamName, data);
+        totalEvents++;
+      }
+    } catch (err) { /* skip */ }
+  });
+
+  es.onerror = () => { /* reconnect handled by EventSource */ };
+}
+
+function discoverTeams() {
+  fetch(`${API_BASE}/api/team_memory?repo=__teams__`)
+    .then(r => r.json())
+    .then(data => {
+      const entries = data?.content?.entries || data?.entries || {};
+      const teams = new Set();
+
+      for (const [key, value] of Object.entries(entries)) {
+        if (key.startsWith('team/') && value !== '__DELETED__') {
+          const teamName = key.replace('team/', '');
+          if (teamName && !teamName.includes('__DELETED__')) {
+            teams.add(teamName);
+          }
+        }
+      }
+
+      // Also scan known teams from SSE events table
+      if (teams.size === 0 && data?.content?.entries) {
+        for (const key of Object.keys(data.content.entries)) {
+          if (key.startsWith('team/') && !key.includes('__DELETED__')) {
+            teams.add(key.replace('team/', ''));
+          }
+        }
+      }
+
+      if (teams.size === 0) {
+        document.getElementById('teamGrid').innerHTML =
+          `<div class="empty-state"><div class="icon">📭</div><div>No teams registered yet.<br><small>Create a team with <code>/team-create</code> in Claude Code.</small></div></div>`;
+        return;
+      }
+
+      closeAllSSE();
+      for (const team of teams) {
+        connectTeamSSE(team);
+      }
+      setStatus(teams.size > 0);
+    })
+    .catch(err => {
+      console.error('Team discovery failed:', err);
+      document.getElementById('teamGrid').innerHTML =
+        `<div class="empty-state"><div class="icon">⚠️</div><div>Cannot reach sync server<br><small>${err.message}</small></div></div>`;
+    });
+}
+
+function render() {
+  if (teamAgents.size === 0) return;
+  updateLastUpdate();
+
+  let html = '';
+  for (const [teamName, agents] of teamAgents) {
+    if (agents.size === 0) continue;
+    html += `<div class="team-card">`;
+    html += `<div class="team-header"><h2>${escapeHtml(teamName)}</h2><span class="member-count">${agents.size} agents</span></div>`;
+    html += `<div class="agent-list">`;
+    const sorted = [...agents.values()].sort((a, b) => b.lastSeen - a.lastSeen);
+    for (const a of sorted) {
+      const status = (Date.now() - a.lastSeen > 120000) ? 'offline' : (a.status || 'online');
+      html += `<div class="agent-row">
+        <span class="agent-dot ${status}"></span>
+        <div class="agent-info">
+          <div class="agent-name">${escapeHtml(a.agentName)}</div>
+          <div class="agent-host">${escapeHtml(a.hostname || a.agentId)}</div>
+        </div>
+        <span class="agent-status ${status}">${status}</span>
+        <span class="agent-time">${formatTime(a.lastSeen)}</span>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+  document.getElementById('teamGrid').innerHTML = html ||
+    `<div class="empty-state"><div class="icon">📡</div><div>Listening for agent presence events...</div></div>`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Init
+discoverTeams();
+// Re-discover every 60s
+setInterval(discoverTeams, 60000);
+// Render refresh every 5s
+setInterval(render, 5000);
+// Page auto-reload every 5min (via meta refresh)
+</script>
+</body>
+</html>

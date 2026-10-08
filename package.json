@@ -1,0 +1,66 @@
+{
+  "name": "@team-collab/core",
+  "version": "1.0.0",
+  "description": "多智能体团队协作插件 - 支持 Claude Code 和 Open Code 的 Agent Swarm 团队协作",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./core": {
+      "import": "./dist/core/types.js",
+      "types": "./dist/core/types.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "node ./node_modules/typescript/bin/tsc",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "dev": "node ./node_modules/typescript/bin/tsc --watch",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "node --test test/test-*.js",
+    "test:force-exit": "node --test --test-force-exit test/test-*.js",
+    "test:coverage": "node --experimental-coverage --test test/test-*.js",
+    "control:register": "node scripts/register-runtime.mjs",
+    "control:poll": "node scripts/poll-tasks.mjs",
+    "control:demo": "node scripts/demo-flow.mjs"
+  },
+  "keywords": [
+    "team",
+    "collaboration",
+    "swarm",
+    "agent",
+    "claude-code",
+    "open-code",
+    "multi-agent",
+    "plugin"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "proper-lockfile": "^4.1.2",
+    "uuid": "^14.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/proper-lockfile": "^4.1.4",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@opencode-ai/plugin": {
+      "optional": true
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lanszdg/team-work.git"
+  }
+}

@@ -1,0 +1,81 @@
+[
+  {
+    "event": "PreToolUse",
+    "matcher": "Bash|Write|Edit|MultiEdit",
+    "hooks": [
+      {
+        "type": "command",
+        "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/permission-check.cjs",
+        "env": {
+          "TEAM_NAME": "${CLAUDE_CODE_TEAM_NAME}",
+          "AGENT_NAME": "${CLAUDE_CODE_AGENT_NAME}"
+        }
+      }
+    ]
+  },
+  {
+    "event": "Stop",
+    "hooks": [
+      {
+        "type": "command",
+        "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/on-stop.mjs",
+        "env": {
+          "CONTROL_PLANE_URL": "${CONTROL_PLANE_URL}",
+          "CONTROL_PLANE_TOKEN": "${CONTROL_PLANE_TOKEN}",
+          "ORG_ID": "${ORG_ID}"
+        }
+      },
+      {
+        "type": "command",
+        "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/gate-stop.mjs",
+        "env": {
+          "TEAM_NAME": "${CLAUDE_CODE_TEAM_NAME}",
+          "AGENT_ID": "${CLAUDE_CODE_AGENT_ID}",
+          "AGENT_NAME": "${CLAUDE_CODE_AGENT_NAME}",
+          "TEAM_MEMORY_SYNC_URL": "${TEAM_MEMORY_SYNC_URL}",
+          "TEAM_MEMORY_SYNC_API_KEY": "${TEAM_MEMORY_SYNC_API_KEY}"
+        }
+      }
+    ]
+  },
+  {
+    "event": "UserPromptSubmit",
+    "hooks": [
+      {
+        "type": "command",
+        "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/handle-user-input.mjs \"${CLAUDE_CODE_USER_PROMPT}\"",
+        "env": {
+          "TEAM_NAME": "${CLAUDE_CODE_TEAM_NAME}",
+          "AGENT_NAME": "${CLAUDE_CODE_AGENT_NAME}",
+          "AGENT_ID": "${CLAUDE_CODE_AGENT_ID}"
+        }
+      }
+    ]
+  },
+  {
+    "event": "SessionStart",
+    "hooks": [
+      {
+        "type": "command",
+        "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/discover-on-start.mjs",
+        "env": {
+          "TEAM_NAME": "${CLAUDE_CODE_TEAM_NAME}",
+          "AGENT_NAME": "${CLAUDE_CODE_AGENT_NAME}",
+          "AGENT_ID": "${CLAUDE_CODE_AGENT_ID}",
+          "TEAM_MEMORY_SYNC_URL": "${TEAM_MEMORY_SYNC_URL}",
+          "TEAM_MEMORY_SYNC_API_KEY": "${TEAM_MEMORY_SYNC_API_KEY}"
+        }
+      },
+      {
+        "type": "command",
+        "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/gate-session-start.mjs",
+        "env": {
+          "TEAM_NAME": "${CLAUDE_CODE_TEAM_NAME}",
+          "AGENT_ID": "${CLAUDE_CODE_AGENT_ID}",
+          "TEAM_MEMORY_SYNC_URL": "${TEAM_MEMORY_SYNC_URL}",
+          "TEAM_MEMORY_SYNC_API_KEY": "${TEAM_MEMORY_SYNC_API_KEY}"
+        }
+      }
+    ]
+  }
+]

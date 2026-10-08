@@ -1,0 +1,33 @@
+{
+  "name": "team-collab",
+  "version": "1.0.0",
+  "description": "多智能体团队协作插件 - 支持 Leader-Teammate Swarm 模式的 Agent 编排、文件锁管理、跨队友通信和权限控制",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "team",
+    "collaboration",
+    "swarm",
+    "agent",
+    "coordination",
+    "cloud-sync",
+    "multi-machine"
+  ],
+  "main": "dist/index.js",
+  "init": "dist/platform/claude-code.js",
+  "hooks": "hooks/hooks.json",
+  "monitors": "monitors/monitors.json",
+  "skills": "skills/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lanszdg/team-work.git"
+  },
+  "engines": {
+    "claude-code": ">=1.0.0"
+  },
+  "config": {
+    "teammateMode": "auto",
+    "debounceMs": 5000,
+    "maxEventsPerWindow": 3
+  }
+}

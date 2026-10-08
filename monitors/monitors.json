@@ -1,0 +1,15 @@
+[
+  {
+    "name": "team-collab-monitor",
+    "description": "带消抖的团队协作状态监控 - 仅在检测到致命冲突时输出到 stdout 触发模型唤醒",
+    "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/monitor-debounce.js",
+    "env": {
+      "TEAM_NAME": "${CLAUDE_CODE_TEAM_NAME}",
+      "DEBOUNCE_MS": "5000",
+      "MAX_EVENTS_PER_WINDOW": "3",
+      "CLAUDE_PLUGIN_DATA": "${CLAUDE_PLUGIN_DATA}"
+    },
+    "restart_on_exit": true,
+    "restart_delay_ms": 3000
+  }
+]

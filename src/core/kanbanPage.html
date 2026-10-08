@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Kanban Board</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f1117;
+    color: #e1e4e8;
+    min-height: 100vh;
+  }
+  .layout { display: flex; min-height: 100vh; }
+  /* Sidebar — team list */
+  .sidebar {
+    width: 220px;
+    background: #161b22;
+    border-right: 1px solid #21262d;
+    padding: 16px;
+    flex-shrink: 0;
+  }
+  .sidebar h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #8b949e;
+    margin-bottom: 12px;
+    letter-spacing: 0.05em;
+  }
+  .team-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+  }
+  .team-item:hover { background: #1c2129; }
+  .team-item.active { background: #1f6feb22; color: #58a6ff; }
+  .team-item .desc { font-size: 0.7rem; color: #8b949e; margin-top: 2px; }
+  /* Main content */
+  .main { flex: 1; padding: 24px; overflow-x: auto; }
+  /* Header */
+  .header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #21262d;
+  }
+  .header h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 4px; }
+  .header .desc { color: #8b949e; font-size: 0.9rem; margin-bottom: 8px; }
+  .header .meta { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 0.8rem; }
+  .header .meta-item { color: #8b949e; }
+  .header .meta-item strong { color: #e1e4e8; }
+  /* Badges */
+  .badge {
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .badge-online { background: #1a4731; color: #3fb950; }
+  .badge-degraded { background: #3d2e00; color: #d29922; }
+  .badge-offline { background: #3d1214; color: #f85149; }
+  .badge-unknown { background: #21262d; color: #8b949e; }
+  /* Sections */
+  .section-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8b949e;
+    margin-bottom: 8px;
+    margin-top: 20px;
+  }
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #161b22;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid #21262d;
+    font-size: 0.85rem;
+  }
+  th {
+    background: #1c2129;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8b949e;
+    font-weight: 600;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1c2129; }
+  .status-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .dot-online { background: #3fb950; }
+  .dot-idle { background: #d29922; }
+  .dot-offline { background: #f85149; }
+  .role-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+  .role-lead { background: #1f6feb22; color: #58a6ff; }
+  .role-coder { background: #3fb95022; color: #3fb950; }
+  .role-reviewer { background: #d2992222; color: #d29922; }
+  .role-default { background: #21262d; color: #8b949e; }
+  .mode-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    background: #21262d;
+    color: #c9d1d9;
+  }
+  /* Team tasks */
+  .task-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 8px;
+  }
+  .task-card {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+  .task-card .who { font-size: 0.7rem; color: #8b949e; }
+  .task-card .what { font-size: 0.85rem; margin-top: 2px; }
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 32px 16px;
+    color: #8b949e;
+    font-size: 0.85rem;
+  }
+  /* Error bar */
+  .error-bar {
+    background: #3d1214;
+    color: #f85149;
+    padding: 8px 16px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+  }
+  .last-poll { font-size: 0.7rem; color: #8b949e; margin-top: 12px; text-align: right; }
+  @media (max-width: 700px) {
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; border-right: none; border-bottom: 1px solid #21262d; }
+    th, td { padding: 6px 8px; font-size: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar: Team List -->
+  <aside class="sidebar">
+    <h3>Teams</h3>
+    <div id="teamList">
+      <div class="team-item active" data-team="">
+        <div>Loading...</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div id="errorBar"></div>
+
+    <!-- Header: Team Info -->
+    <div class="header">
+      <h1 id="teamName">—</h1>
+      <div class="desc" id="teamDesc"></div>
+      <div class="meta">
+        <span class="meta-item">Lead: <strong id="teamLead">—</strong></span>
+        <span class="meta-item">Members: <strong id="teamCount">—</strong></span>
+        <span id="cloudBadge" class="badge badge-unknown">Cloud: checking...</span>
+        <span class="meta-item">Online: <strong id="onlineCount">—</strong></span>
+      </div>
+    </div>
+
+    <!-- Team Tasks -->
+    <div class="section-title">Team Tasks</div>
+    <div id="taskArea">
+      <div class="empty-state">No active tasks</div>
+    </div>
+
+    <!-- Members Table -->
+    <div class="section-title">Members</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Machine</th>
+          <th>Status</th>
+          <th>Mode</th>
+          <th>Task</th>
+        </tr>
+      </thead>
+      <tbody id="memberBody">
+        <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+
+    <div class="last-poll" id="lastPoll"></div>
+  </main>
+</div>
+
+<script>
+(function() {
+  const POLL_MS = 3000;
+  let currentTeam = null;
+
+  function statusClass(s) {
+    switch (s) {
+      case 'online': return 'dot-online';
+      case 'idle': return 'dot-idle';
+      default: return 'dot-offline';
+    }
+  }
+
+  function cloudBadgeClass(s) {
+    switch (s) {
+      case 'healthy': return 'badge-online';
+      case 'degraded': return 'badge-degraded';
+      case 'offline': return 'badge-offline';
+      default: return 'badge-unknown';
+    }
+  }
+
+  function roleClass(role) {
+    switch ((role || '').toLowerCase()) {
+      case 'coordinator':
+      case 'lead':
+        return 'role-lead';
+      case 'coder':
+      case 'developer':
+        return 'role-coder';
+      case 'reviewer':
+      case 'auditor':
+        return 'role-reviewer';
+      default: return 'role-default';
+    }
+  }
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(text));
+    return d.innerHTML;
+  }
+
+  function renderTeamList(teams, current) {
+    var html = '';
+    if (!teams || teams.length === 0) {
+      html = '<div class="team-item" style="cursor:default;color:#8b949e;">No teams found</div>';
+    } else {
+      for (var i = 0; i < teams.length; i++) {
+        var t = teams[i];
+        var active = t.name === current ? ' active' : '';
+        html += '<div class="team-item' + active + '" data-team="' + escapeHtml(t.name) + '">'
+          + '<div>' + escapeHtml(t.name) + '</div>'
+          + '<div class="desc">' + (t.description ? escapeHtml(t.description) : t.memberCount + ' members') + '</div>'
+          + '</div>';
+      }
+    }
+    document.getElementById('teamList').innerHTML = html;
+
+    // Click handlers
+    var items = document.querySelectorAll('.team-item[data-team]');
+    for (var j = 0; j < items.length; j++) {
+      items[j].addEventListener('click', function() {
+        var tn = this.getAttribute('data-team');
+        if (tn && tn !== currentTeam) {
+          currentTeam = tn;
+          poll();
+        }
+      });
+    }
+  }
+
+  function render(state) {
+    if (!currentTeam) currentTeam = state.teamName;
+
+    // Header
+    document.getElementById('teamName').textContent = state.teamName || 'Unknown Team';
+    document.getElementById('teamDesc').textContent = state.teamDescription || '';
+    document.getElementById('teamLead').textContent = state.leadName || '—';
+    document.getElementById('teamCount').textContent = state.totalMembers || 0;
+    document.getElementById('onlineCount').textContent =
+      state.onlineCount >= 0 ? state.onlineCount : '?';
+
+    // Cloud badge
+    var badge = document.getElementById('cloudBadge');
+    badge.textContent = 'Cloud: ' + (state.cloudStatus || 'unknown');
+    badge.className = 'badge ' + cloudBadgeClass(state.cloudStatus);
+
+    // Last poll
+    document.getElementById('lastPoll').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+
+    // Clear errors
+    document.getElementById('errorBar').innerHTML = '';
+
+    // Team tasks
+    var taskArea = document.getElementById('taskArea');
+    if (state.teamTasks && state.teamTasks.length > 0) {
+      var taskHtml = '<ul class="task-list">';
+      for (var i = 0; i < state.teamTasks.length; i++) {
+        var t = state.teamTasks[i];
+        taskHtml += '<li class="task-card">'
+          + '<div class="who">' + escapeHtml(t.member) + '</div>'
+          + '<div class="what">' + escapeHtml(t.task) + '</div>'
+          + '</li>';
+      }
+      taskHtml += '</ul>';
+      taskArea.innerHTML = taskHtml;
+    } else {
+      taskArea.innerHTML = '<div class="empty-state">No active tasks</div>';
+    }
+
+    // Members table
+    var tbody = document.getElementById('memberBody');
+    if (!state.members || state.members.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No members found</td></tr>';
+      return;
+    }
+
+    var html = '';
+    for (var j = 0; j < state.members.length; j++) {
+      var m = state.members[j];
+      var dot = '<span class="status-dot ' + statusClass(m.status) + '"></span>';
+      var role = m.role || 'member';
+      var roleTag = '<span class="role-tag ' + roleClass(role) + '">' + escapeHtml(role) + '</span>';
+      var mode = m.mode ? '<span class="mode-tag">' + escapeHtml(m.mode) + '</span>' : '-';
+      var task = m.task || '-';
+      html += '<tr>'
+        + '<td>' + dot + escapeHtml(m.name) + '</td>'
+        + '<td>' + roleTag + '</td>'
+        + '<td>' + escapeHtml(m.machine || '-') + '</td>'
+        + '<td>' + m.status + '</td>'
+        + '<td>' + mode + '</td>'
+        + '<td>' + escapeHtml(task) + '</td>'
+        + '</tr>';
+    }
+    tbody.innerHTML = html;
+  }
+
+  function renderError(msg) {
+    document.getElementById('errorBar').innerHTML =
+      '<div class="error-bar">' + escapeHtml(msg) + '</div>';
+    document.getElementById('lastPoll').textContent = '';
+  }
+
+  async function loadTeams() {
+    try {
+      var res = await fetch('/api/teams');
+      if (!res.ok) return;
+      var data = await res.json();
+      renderTeamList(data.teams || [], data.current);
+    } catch (e) {
+      // Silently ignore — teams list is non-critical
+    }
+  }
+
+  async function poll() {
+    try {
+      var url = currentTeam ? '/api/state?team=' + encodeURIComponent(currentTeam) : '/api/state';
+      var res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var state = await res.json();
+      render(state);
+      // Refresh team list after first successful poll
+      loadTeams();
+    } catch (err) {
+      renderError('Failed to fetch state: ' + err.message);
+    }
+  }
+
+  poll();
+  setInterval(poll, POLL_MS);
+  loadTeams();
+})();
+</script>
+</body>
+</html>
